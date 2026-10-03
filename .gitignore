@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+
+# Django
+db.sqlite3
+*.log
+
+# IDE / Editor
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test / coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Local data
+data/*.csv
