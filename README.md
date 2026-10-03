@@ -155,7 +155,7 @@ Do not commit `.env` or API keys to GitHub.
 ### 1. Clone the repository
 
 ```bash
-git clone <your-github-repository-url>
+git clone https://github.com/ishtiaqhadia09-maker/django-fuel-route-api.git
 cd django-fuel-route-api
 ```
 
