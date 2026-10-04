@@ -67,7 +67,6 @@ class RoutingService:
             "geometry": self.simplify_geometry(
                 route["geometry"]
             ),
-            "raw_geometry": route["geometry"],
         }
 
     def simplify_geometry(self, geometry):

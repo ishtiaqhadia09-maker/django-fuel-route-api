@@ -116,6 +116,11 @@ class FuelOptimizer:
         - Maximum range is 500 miles.
         - At every selected station, the tank is refilled to full.
         - Initial fuel is free because its purchase price is unknown.
+
+        The cost of reaching a fuel station is based on the
+        amount of fuel consumed since the previous stop, using
+        the current station's price because that is where the
+        tank is refilled.
         """
 
         stations = sorted(
@@ -123,96 +128,81 @@ class FuelOptimizer:
             key=lambda station: station["distance_from_start"],
         )
 
-        # Remove duplicate stations at the same route position.
-        unique_stations = []
-
-        seen_positions = set()
+        # Keep the cheapest station when multiple stations
+        # have the same approximate route position.
+        unique_stations = {}
 
         for station in stations:
             position = station["distance_from_start"]
 
-            if position in seen_positions:
-                continue
+            if (
+                position not in unique_stations
+                or station["price"]
+                < unique_stations[position]["price"]
+            ):
+                unique_stations[position] = station
 
-            seen_positions.add(position)
-            unique_stations.append(station)
+        stations = list(unique_stations.values())
 
-        # Add the destination as the final node.
+        start = {
+            "station": None,
+            "price": None,
+            "distance_from_start": 0,
+        }
+
         destination = {
             "station": None,
             "price": None,
             "distance_from_start": route_distance,
         }
 
-        nodes = unique_stations + [destination]
+        nodes = [start] + stations + [destination]
 
         # cost[i] = cheapest cost to reach node i.
         costs = [float("inf")] * len(nodes)
 
-        # previous[i] = previous node used in the cheapest path.
+        # previous[i] = previous node used to reach node i.
         previous = [None] * len(nodes)
 
-        # Starting point is free because the vehicle
-        # starts with a full tank.
-        start_position = 0
+        # Starting with a full tank means reaching the
+        # first station uses free initial fuel.
+        costs[0] = 0
 
-        for index, node in enumerate(nodes):
+        for index in range(1, len(nodes)):
+            current_node = nodes[index]
+            current_position = current_node["distance_from_start"]
 
-            current_position = node["distance_from_start"]
-
-            # Find the cheapest known way to reach this node.
-            if index == 0:
-                distance_from_start = current_position
-
-                if distance_from_start <= self.MAX_RANGE_MILES:
-                    if node["station"] is not None:
-                        fuel_needed = (
-                            distance_from_start / self.MPG
-                        )
-
-                        costs[index] = (
-                            fuel_needed * node["price"]
-                        )
-
-            # Check every previous reachable node.
             for previous_index in range(index):
-
                 previous_node = nodes[previous_index]
-
                 previous_position = (
                     previous_node["distance_from_start"]
                 )
 
-                distance = (
-                    current_position - previous_position
-                )
+                distance = current_position - previous_position
 
+                # Invalid or unreachable segment.
                 if distance <= 0:
                     continue
 
                 if distance > self.MAX_RANGE_MILES:
                     continue
 
-                # Reaching the destination does not require
-                # buying additional fuel.
-                if node["station"] is None:
+                # Destination does not require a fuel purchase.
+                if current_node["station"] is None:
                     travel_cost = 0
                 else:
-                    gallons_needed = distance / self.MPG
+                    gallons_used = distance / self.MPG
                     travel_cost = (
-                        gallons_needed * node["price"]
+                        gallons_used * current_node["price"]
                     )
 
-                if (
+                new_cost = (
                     costs[previous_index]
                     + travel_cost
-                    < costs[index]
-                ):
-                    costs[index] = (
-                        costs[previous_index]
-                        + travel_cost
-                    )
+                )
 
+                if new_cost < costs[index]:
+                    costs[index] = new_cost
                     previous[index] = previous_index
 
         destination_index = len(nodes) - 1
@@ -229,7 +219,6 @@ class FuelOptimizer:
         current_index = previous[destination_index]
 
         while current_index is not None:
-
             node = nodes[current_index]
 
             if node["station"] is not None:
@@ -241,17 +230,15 @@ class FuelOptimizer:
 
         return selected_stops
 
-
     def calculate_cost(self, route_distance, stops):
         """
-        Calculate fuel purchased and total cost.
+        Calculate total fuel purchased and total fuel cost.
 
         Assumptions:
         - Vehicle starts with a full 50-gallon tank.
-        - Fuel economy is 10 miles per gallon.
-        - At each selected stop, the vehicle refuels to full.
-        - Initial fuel cost is excluded because its price
-        is not provided.
+        - Vehicle gets 10 miles per gallon.
+        - At each selected stop, the tank is refilled to full.
+        - Initial fuel is free because its purchase price is unknown.
         """
 
         tank_capacity = self.TANK_CAPACITY_GALLONS
@@ -268,12 +255,20 @@ class FuelOptimizer:
                 - current_position
             )
 
-            fuel_used = (
-                distance_to_stop / self.MPG
-            )
+            if distance_to_stop <= 0:
+                continue
+
+            fuel_used = distance_to_stop / self.MPG
+
+            if fuel_used > current_fuel:
+                raise ValueError(
+                    "Selected fuel stops are not reachable "
+                    "within the vehicle's fuel range."
+                )
 
             current_fuel -= fuel_used
 
+            # Refill the tank to its full capacity.
             gallons_to_buy = (
                 tank_capacity - current_fuel
             )
@@ -284,10 +279,25 @@ class FuelOptimizer:
                 gallons_to_buy * stop["price"]
             )
 
-            # Tank is full again.
             current_fuel = tank_capacity
             current_position = (
                 stop["distance_from_start"]
+            )
+
+        # Make sure the vehicle can reach the destination
+        # using the fuel remaining after the final stop.
+        remaining_distance = (
+            route_distance - current_position
+        )
+
+        remaining_fuel_needed = (
+            remaining_distance / self.MPG
+        )
+
+        if remaining_fuel_needed > current_fuel:
+            raise ValueError(
+                "Final fuel stop does not provide enough "
+                "range to reach the destination."
             )
 
         return {
