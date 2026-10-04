@@ -39,13 +39,13 @@ class RouteAPIView(APIView):
             route["geometry"],
         )
 
-        # 5. Select cost-effective fuel stops
+        # 4a. Select cost-effective fuel stops
         fuel_stops = optimizer.optimize(
             route_distance=route["distance_miles"],
             stations=positioned_stations,
         )
 
-        # 6. Calculate fuel cost
+        # 4b. Calculate fuel cost
         fuel_cost = optimizer.calculate_cost(
             route_distance=route["distance_miles"],
             stops=fuel_stops,
