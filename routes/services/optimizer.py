@@ -251,7 +251,7 @@ class FuelOptimizer:
         - Fuel economy is 10 miles per gallon.
         - At each selected stop, the vehicle refuels to full.
         - Initial fuel cost is excluded because its price
-          is not provided.
+        is not provided.
         """
 
         tank_capacity = self.TANK_CAPACITY_GALLONS
